@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "weekly-report-generator"
+version = "1.0.0"
+description = "Fetch tasks from Smartsheet and generate weekly report PPTX."
+authors = [{ name = "wyatthoho", email = "wyatthoho@gmail.com" }]
+dependencies = [
+    "smartsheet-python-sdk >= 3.0.0",
+    "python-dotenv >= 1.2.2",
+]
+requires-python = ">=3.12"
+readme = "README.md"
+license = { file = "LICENSE" }
+
+[project.scripts]
+weekly-report = "weekly_report.main:main"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[project.optional-dependencies]
+dev = ["pytest >= 8.3.4"]
