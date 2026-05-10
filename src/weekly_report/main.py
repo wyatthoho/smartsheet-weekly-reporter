@@ -1,140 +1,245 @@
-"""
-main.py
-Fetch tasks from Smartsheet for the specified week and group them by parent task.
-
-Filtering criteria:
-  - Assigned To == MY_NAME
-  - End Date >= Monday of the target week
-  - Start Date <= Friday of the target week
-  - Only leaf rows (no children) are included as action items
-  - Each leaf is grouped under its direct parent task name
-"""
+import sys
+import copy
+import win32clipboard
+from datetime import date, datetime, timedelta
+from dotenv import load_dotenv, find_dotenv
 
 import smartsheet
-from datetime import date, timedelta
-from collections import defaultdict
-
-# ── Configuration ─────────────────────────────────────
-API_TOKEN = "your_smartsheet_api_token"
-SHEET_ID = 123456789  # Your Sheet ID (integer), found in File > Properties
-MY_NAME = "Wyatt Ho"  # Value in the "Assigned To" column
-# ─────────────────────────────────────────────────────
+from smartsheet.models.sheet import Sheet as SmartSheet
+from weekly_report.utils import get_env_variable
 
 
-def get_week_range(offset: int = 0) -> tuple[date, date]:
-    """Return the Monday and Friday of the target week.
+ENV_API_TOKEN = "API_TOKEN"
+ENV_SHEET_ID = "SHEET_ID"
+ENV_EMPLOYEE = "EMPLOYEE"
+FIELD_ASSIGN = "Assigned To"
+FIELD_START = "Start Date"
+FIELD_END = "End Date"
+FIELD_TASK = "Task"
 
-    Args:
-        offset: 0 = current week, -1 = last week, 1 = next week, etc.
-    """
+
+# ---------------------------------------------------------------------------
+# Config
+# ---------------------------------------------------------------------------
+
+
+def _load_env_config() -> tuple[str, str, str]:
+    try:
+        load_dotenv(find_dotenv())
+        api_token = get_env_variable(ENV_API_TOKEN)
+        sheet_id = get_env_variable(ENV_SHEET_ID)
+        employee = get_env_variable(ENV_EMPLOYEE)
+    except ValueError:
+        sys.exit(1)
+    return api_token, sheet_id, employee
+
+
+# ---------------------------------------------------------------------------
+# Date helpers
+# ---------------------------------------------------------------------------
+
+
+def _get_week_range(offset: int = 0) -> tuple[date, date]:
     today = date.today()
     monday = today - timedelta(days=today.weekday()) + timedelta(weeks=offset)
     friday = monday + timedelta(days=4)
     return monday, friday
 
 
-def parse_date(value: str | None) -> date | None:
-    """Parse a date string returned by the Smartsheet API (ISO format: YYYY-MM-DD)."""
+def _parse_date(value: str | None) -> date | None:
     if not value:
         return None
     try:
-        return date.fromisoformat(value)
+        return datetime.fromisoformat(value).date()
     except ValueError:
         return None
 
 
-def fetch_tasks(offset: int = 0) -> dict[str, list[str]]:
-    """Fetch and group tasks from Smartsheet for the target week.
+# ---------------------------------------------------------------------------
+# Smartsheet fetching
+# ---------------------------------------------------------------------------
 
-    Returns:
-        A dict mapping parent task name -> list of leaf task names.
-        Example: {"TotalEnergies Compatibility Testing": ["Tensile test", "Measure weight"]}
-    """
-    monday, friday = get_week_range(offset)
-    print(f"Fetching tasks for: {monday} ~ {friday}")
 
-    client = smartsheet.Smartsheet(API_TOKEN)
-    sheet = client.Sheets.get_sheet(SHEET_ID)
-
-    # Build column title -> column_id lookup
-    col_map = {col.title: col.id for col in sheet.columns}
-
-    def get_col_id(name: str) -> int:
-        col_id = col_map.get(name)
-        if col_id is None:
-            raise KeyError(
-                f"Column '{name}' not found. Available columns: {list(col_map.keys())}"
-            )
-        return col_id
-
-    col_assigned = get_col_id("Assigned To")
-    col_start = get_col_id("Start Date")
-    col_end = get_col_id("End Date")
-    col_task = get_col_id("Task Name")
-
-    # Build row_id -> row data map, preserving parent_id for hierarchy traversal
-    row_map: dict[int, dict] = {}
+def _fetch_weekly_tasks(
+    sheet: SmartSheet,
+    col_ids: dict[str, int],
+    employee: str,
+    monday: date,
+    friday: date,
+) -> dict[int, dict]:
+    tasks: dict[int, dict] = {}
     for row in sheet.rows:
-        cells = {cell.column_id: cell.display_value for cell in row.cells}
-        row_map[row.id] = {
-            "id": row.id,
+        assigned = row.get_column(col_ids[FIELD_ASSIGN]).value
+
+        if assigned != employee:
+            continue
+
+        start = _parse_date(row.get_column(col_ids[FIELD_START]).value)
+        end = _parse_date(row.get_column(col_ids[FIELD_END]).value)
+
+        if not start and not end:
+            continue
+
+        if start > friday or end < monday:
+            continue
+
+        task_name = row.get_column(col_ids[FIELD_TASK]).value
+
+        tasks[row.id_] = {
             "parent_id": row.parent_id,
-            "task": cells.get(col_task, "") or "",
-            "assigned": cells.get(col_assigned, "") or "",
-            "start": parse_date(cells.get(col_start)),
-            "end": parse_date(cells.get(col_end)),
+            "task_name": task_name,
+            "children": [],
         }
-
-    # Identify rows that have at least one child (they are not leaf rows)
-    rows_with_children = {r["parent_id"] for r in row_map.values() if r["parent_id"]}
-
-    # Apply all filters: leaf row + assigned to me + date range overlaps the target week
-    leaf_rows = [
-        r
-        for r in row_map.values()
-        if r["id"] not in rows_with_children
-        and r["assigned"] == MY_NAME
-        and r["start"] is not None
-        and r["end"] is not None
-        and r["end"] >= monday
-        and r["start"] <= friday
-    ]
-
-    # Group leaf rows under their direct parent's task name
-    grouped: dict[str, list[str]] = defaultdict(list)
-    for r in leaf_rows:
-        parent = row_map.get(r["parent_id"])
-        group_title = parent["task"] if parent else r["task"]
-        grouped[group_title].append(r["task"])
-
-    return dict(grouped)
+    return tasks
 
 
-def to_gen_format(grouped: dict[str, list[str]]) -> str:
-    """Serialize grouped tasks into the pipe-delimited format expected by gen.js.
-
-    Format: "Title|item1|item2||Title2|item1"
-    """
-    parts = ["|".join([title] + items) for title, items in grouped.items()]
-    return "||".join(parts)
+# ---------------------------------------------------------------------------
+# Task organisation
+# ---------------------------------------------------------------------------
 
 
-def fmt_range(offset: int = 0) -> str:
-    """Return a human-readable date range string, e.g. '5/4 ~ 5/8'."""
-    mon, fri = get_week_range(offset)
-    return f"{mon.month}/{mon.day} ~ {fri.month}/{fri.day}"
+def _organize_family_tasks(tasks: dict[int, dict]) -> dict[int, dict]:
+    tasks_copy = copy.deepcopy(tasks)
+
+    all_row_ids = set(tasks_copy.keys())
+    child_ids = set()
+
+    for row_id, task in tasks_copy.items():
+        parent_id = task["parent_id"]
+
+        if parent_id and parent_id in all_row_ids:
+            tasks_copy[parent_id]["children"].append(task)
+            child_ids.add(row_id)
+
+    return {
+        row_id: task for row_id, task in tasks_copy.items() if row_id not in child_ids
+    }
+
+
+# ---------------------------------------------------------------------------
+# HTML content derivation
+# ---------------------------------------------------------------------------
+
+
+def _derive_html_content(monday: date, friday: date, tasks_org: dict[int, dict]) -> str:
+    def format_children(children: list, depth: int = 0) -> str:
+        """Render second-layer and deeper as a bullet list in gray."""
+        if not children:
+            return ""
+        items = "".join(
+            "<li>"
+            + c["task_name"]
+            + format_children(c.get("children", []), depth + 1)
+            + "</li>"
+            for c in children
+        )
+        return (
+            "<ul style='text-align:left; color:gray; font-size:28pt;; list'>"
+            + items
+            + "</ul>"
+        )
+
+    week_str = f"Week of {monday.strftime('%b %#d')} - {friday.strftime('%b %#d, %Y')}"
+    header = (
+        "<p style='font-size:48pt; margin:0;margin-bottom:24px; text-align:left;'>"
+        + f"<b>{week_str}</b>"
+        + "</p>"
+    )
+
+    # First layer: no bullet, no indent — plain block elements
+    first_layer_items = "".join(
+        "<p style='font-size:28pt; margin:20pt 0 0 0; text-align:left;'>"
+        + task["task_name"]
+        + format_children(task.get("children", []))
+        + "</p>"
+        for task in tasks_org.values()
+    )
+
+    return header + first_layer_items
+
+
+# ---------------------------------------------------------------------------
+# Clipboard
+# ---------------------------------------------------------------------------
+
+
+def _copy_html_to_clipboard(html: str) -> None:
+    CF_HTML = win32clipboard.RegisterClipboardFormat("HTML Format")
+
+    html_body = f"<html><body>{html}</body></html>"
+    header_template = (
+        "Version:0.9\r\n"
+        "StartHTML:{start_html:08d}\r\n"
+        "EndHTML:{end_html:08d}\r\n"
+        "StartFragment:{start_frag:08d}\r\n"
+        "EndFragment:{end_frag:08d}\r\n"
+    )
+
+    dummy_header = header_template.format(
+        start_html=0, end_html=0, start_frag=0, end_frag=0
+    )
+    start_html = len(dummy_header)
+    start_frag = start_html + html_body.index("<html>")
+    end_frag = start_html + html_body.index("</body>") + len("</body>")
+    end_html = start_html + len(html_body)
+
+    header = header_template.format(
+        start_html=start_html,
+        end_html=end_html,
+        start_frag=start_frag,
+        end_frag=end_frag,
+    )
+    data = (header + html_body).encode("utf-8")
+
+    win32clipboard.OpenClipboard()
+    win32clipboard.EmptyClipboard()
+    win32clipboard.SetClipboardData(CF_HTML, data)
+    win32clipboard.CloseClipboard()
+
+
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
 
 
 def main():
-    for label, offset in [("Last week", -1), ("This week", 0)]:
-        print(f"\n=== {label} ({fmt_range(offset)}) ===")
-        tasks = fetch_tasks(offset)
-        for title, items in tasks.items():
-            print(f"  [{title}]")
-            for item in items:
-                print(f"    • {item}")
-        print("\n  gen.js format:")
-        print(f"  {to_gen_format(tasks)}")
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Generate weekly report to clipboard.")
+    parser.add_argument(
+        "--last-week",
+        action="store_true",
+        help="Generate report for last week instead of this week.",
+    )
+    args = parser.parse_args()
+
+    offset = -1 if args.last_week else 0
+    week_label = "last week" if args.last_week else "this week"
+
+    api_token, sheet_id, employee = _load_env_config()
+
+    client = smartsheet.Smartsheet(api_token)
+    sheet = client.Sheets.get_sheet(sheet_id)
+
+    col_ids: dict[str, int] = {col.title: col.id for col in sheet.columns}
+
+    monday, friday = _get_week_range(offset)
+
+    tasks = _fetch_weekly_tasks(sheet, col_ids, employee, monday, friday)
+
+    if not tasks:
+        print(f"No tasks found for {week_label}.")
+        return
+
+    tasks_org = _organize_family_tasks(tasks)
+    html = _derive_html_content(monday, friday, tasks_org)
+    _copy_html_to_clipboard(html)
+
+    print(
+        f"Copied {week_label} "
+        f"({monday.strftime('%b %#d')} - {friday.strftime('%b %#d, %Y')}) "
+        f"to clipboard — paste into your slide with Ctrl+V."
+    )
 
 
 if __name__ == "__main__":

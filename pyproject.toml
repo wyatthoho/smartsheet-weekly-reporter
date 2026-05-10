@@ -10,6 +10,7 @@ authors = [{ name = "wyatthoho", email = "wyatthoho@gmail.com" }]
 dependencies = [
     "smartsheet-python-sdk >= 3.0.0",
     "python-dotenv >= 1.2.2",
+    "pywin32 >= 306",
 ]
 requires-python = ">=3.12"
 readme = "README.md"
