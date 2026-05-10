@@ -134,7 +134,7 @@ def _derive_html_content(monday: date, friday: date, tasks_org: dict[int, dict])
             for c in children
         )
         return (
-            "<ul style='text-align:left; color:gray; font-size:28pt;; list'>"
+            "<ul style='text-align:left; font-size:28pt; color:gray;'>"
             + items
             + "</ul>"
         )
@@ -150,7 +150,9 @@ def _derive_html_content(monday: date, friday: date, tasks_org: dict[int, dict])
     first_layer_items = "".join(
         "<p style='font-size:28pt; margin:20pt 0 0 0; text-align:left;'>"
         + task["task_name"]
+        + "<ul>"
         + format_children(task.get("children", []))
+        + "</ul>"
         + "</p>"
         for task in tasks_org.values()
     )
