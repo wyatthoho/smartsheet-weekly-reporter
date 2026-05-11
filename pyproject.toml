@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "weekly-report-generator"
 version = "1.0.0"
-description = "Fetch tasks from Smartsheet and generate weekly report PPTX."
+description = "Fetch tasks from Smartsheet and copy weekly report to clipboard."
 authors = [{ name = "wyatthoho", email = "wyatthoho@gmail.com" }]
 dependencies = [
     "smartsheet-python-sdk >= 3.0.0",
