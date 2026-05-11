@@ -21,7 +21,13 @@ STYLE_TASK_CHILD = "font-size:28pt; color:gray; text-align:left;"
 class App:
     def __init__(self):
         args = cli.parse_args()
-        self.next_week = 1 if args.next_week else 0
+
+        if args.last_week:
+            self.week_offset = -1
+        elif args.next_week:
+            self.week_offset = 1
+        else:
+            self.week_offset = 0
 
         api_token, sheet_id, self.employee = config.load_env_config()
 
@@ -32,10 +38,13 @@ class App:
         self.monday, self.friday = self.get_week_range()
 
     def run(self):
-        self.tasks = self.fetch_employee_weekly_tasks()
-        if not self.tasks:
+        tasks_raw = self._fetch_raw_weekly_tasks()
+        if not tasks_raw:
+            print("No tasks found.")
             return
-        html = self.derive_html_content()
+
+        tasks = self._organize_raw_tasks(tasks_raw)
+        html = self.derive_html_content(tasks)
         clipboard.copy_html_to_clipboard(html)
         print("Copied to clipboard — paste into your slide with Ctrl+V.")
 
@@ -45,7 +54,7 @@ class App:
     def get_week_range(self) -> tuple[date, date]:
         today = date.today()
         monday = (
-            today - timedelta(days=today.weekday()) + timedelta(weeks=self.next_week)
+            today - timedelta(days=today.weekday()) + timedelta(weeks=self.week_offset)
         )
         friday = monday + timedelta(days=4)
         return monday, friday
@@ -58,12 +67,11 @@ class App:
         except ValueError:
             return None
 
-    def _fetch_raw_employee_weekly_tasks(self) -> dict[int, dict]:
+    def _fetch_raw_weekly_tasks(self) -> dict[int, dict]:
         tasks: dict[int, dict] = {}
         for row in self.sheet.rows:
-            assigned = row.get_column(self.col_ids[FIELD_ASSIGN]).value
-
-            if assigned != self.employee:
+            assign = row.get_column(self.col_ids[FIELD_ASSIGN]).value
+            if assign != self.employee:
                 continue
 
             start = self._parse_date(row.get_column(self.col_ids[FIELD_START]).value)
@@ -103,30 +111,21 @@ class App:
             if row_id not in child_ids
         }
 
-    def fetch_employee_weekly_tasks(self) -> dict[int, dict]:
-        tasks_raw = self._fetch_raw_employee_weekly_tasks()
-
-        if not tasks_raw:
-            print("No tasks found.")
-            return {}
-
-        return self._organize_raw_tasks(tasks_raw)
-
-    def _format_children(self, children: list) -> str:
+    def _fmt_childs(self, children: list) -> str:
         if not children:
             return ""
 
         items = "".join(
             "<li>"
             + child["task_name"]
-            + self._format_children(child.get("children", []))
+            + self._fmt_childs(child.get("children", []))
             + "</li>"
             for child in children
         )
 
         return f"<ul style='{STYLE_TASK_CHILD}'>" + items + "</ul>"
 
-    def derive_html_content(self) -> str:
+    def derive_html_content(self, tasks: dict[int, dict]) -> str:
         monday_fmt = self.monday.strftime("%b %#d")
         friday_fmt = self.friday.strftime("%b %#d, %Y")
         header_str = f"{monday_fmt} - {friday_fmt}"
@@ -134,12 +133,10 @@ class App:
         header_html = f"<p style='{STYLE_HEADER}'>" + f"<b>{header_str}</b>" + "</p>"
 
         items_html = ""
-        for task in self.tasks.values():
+        for task in tasks.values():
             task_html = f"<p style='{STYLE_TASK_MAIN}'>" + task["task_name"] + "</p>"
-            children_html = (
-                "<ul>" + self._format_children(task.get("children", [])) + "</ul>"
-            )
-            items_html += task_html + children_html
+            childs_html = "<ul>" + self._fmt_childs(task.get("children", [])) + "</ul>"
+            items_html += task_html + childs_html
 
         return header_html + items_html
 
