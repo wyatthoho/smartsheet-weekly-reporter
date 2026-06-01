@@ -3,9 +3,9 @@ requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "weekly-report-generator"
+name = "smartsheet-weekly-reporter"
 version = "1.0.0"
-description = "Fetch tasks from Smartsheet and copy weekly report to clipboard."
+description = "Fetch tasks from Smartsheet for the specified week and formats them for easy pasting straight into PowerPoint slides."
 authors = [{ name = "wyatthoho", email = "wyatthoho@gmail.com" }]
 dependencies = [
     "smartsheet-python-sdk >= 3.0.0",

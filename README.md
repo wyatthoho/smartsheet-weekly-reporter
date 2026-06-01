@@ -1,11 +1,11 @@
-# Weekly Report Generator
+# Smartsheet Weekly Reporter
 
 Fetch tasks from Smartsheet for the specified week and formats them for easy pasting straight into PowerPoint slides.
 
 ## Prerequisites
 
 - OS: Windows (required for clipboard actions)
-- Python: 3.10+
+- Python: 3.12+
 
 ## Install Python Packages
 
