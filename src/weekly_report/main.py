@@ -14,9 +14,9 @@ FIELD_START = "Start Date"
 FIELD_END = "End Date"
 FIELD_TASK = "Task"
 
-STYLE_HEADER = "font-size:40pt; margin:0; margin-bottom:24px; text-align:left;"
+STYLE_HEADER = "font-size:40pt; margin:0; margin-bottom:8px; text-align:left;"
 STYLE_TASK_MAIN = "font-size:28pt; margin:20pt 0 0 0; text-align:left;"
-STYLE_TASK_CHILD = "font-size:28pt; color:gray; text-align:left;"
+STYLE_TASK_CHILD = "font-size:28pt; margin:6pt 0 0 0; color:gray; text-align:left;"
 
 
 @dataclass
