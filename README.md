@@ -34,9 +34,9 @@ EMPLOYEE=Your Email As It Appears In Smartsheet
 Run the script using one of the following commands:
 
 ```bash
-python main.py  # For current week
-python main.py --last-week  # For last week
-python main.py --next-week  # For next week
+weekly-report  # For current week
+weekly-report --last-week  # For last week
+weekly-report --next-week  # For next week
 ```
 
 Once the terminal prints "Copied to clipboard", 
