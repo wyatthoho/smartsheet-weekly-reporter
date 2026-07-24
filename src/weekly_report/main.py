@@ -41,7 +41,20 @@ class App:
         api_token, sheet_id, self.employee = config.load_env_config()
 
         client = smartsheet.Smartsheet(api_token)
-        self.sheet = client.Sheets.get_sheet(sheet_id)
+        # Limit to specific columns (instead of fetching all columns/rows) to avoid
+        # a 500/errorCode 4000 "unexpected error" from the Smartsheet API, likely
+        # caused by the full sheet response being too large or containing an
+        # unsupported column type.
+        self.sheet = client.Sheets.get_sheet(
+            sheet_id,
+            column_ids=[
+                5652620625874820,  # 'Project'
+                3400820812189572,  # 'Task'
+                586071045083012,   # 'Assigned To'
+                1711970951925636,  # 'Start Date'
+                6215570579296132,  # 'End Date'
+            ],
+        )
 
         self.col_ids = self.get_col_ids()
         self.monday, self.friday = self.get_week_range()
