@@ -8,11 +8,7 @@ import smartsheet
 from weekly_report import cli, clipboard, config
 
 TIMEZONE = "Asia/Taipei"
-FIELD_ASSIGN = "Assigned To"
-FIELD_START = "Start Date"
-FIELD_END = "End Date"
-FIELD_TASK = "Task"
-
+FIELDS = ["Task", "Assigned To", "Start Date", "End Date"]
 STYLE_HEADER = "font-size:40pt; margin:0; margin-bottom:8px; text-align:left;"
 STYLE_TASK_MAIN = "font-size:28pt; margin:20pt 0 0 0; text-align:left;"
 STYLE_TASK_CHILD = "font-size:28pt; margin:6pt 0 0 0; color:gray; text-align:left;"
@@ -29,56 +25,40 @@ class Task:
 class App:
     def __init__(self):
         args = cli.parse_args()
-
-        if args.last_week:
-            self.week_offset = -1
-        elif args.next_week:
-            self.week_offset = 1
-        else:
-            self.week_offset = 0
+        week_offset = self._get_week_offset(args)
+        self.monday, self.friday = self._get_week_range(week_offset)
 
         api_token, sheet_id, self.employee = config.load_env_config()
-
         client = smartsheet.Smartsheet(api_token)
+
+        self.column_ids = self._get_column_ids(client, sheet_id)
+        self.sheet = client.Sheets.get_sheet(sheet_id, column_ids=self.column_ids)
+
+    @staticmethod
+    def _get_column_ids(client: smartsheet.Smartsheet, sheet_id: str) -> list[int]:
         # Limit to specific columns (instead of fetching all columns/rows) to avoid
         # a 500/errorCode 4000 "unexpected error" from the Smartsheet API, likely
         # caused by the full sheet response being too large or containing an
         # unsupported column type.
-        self.sheet = client.Sheets.get_sheet(
-            sheet_id,
-            column_ids=[
-                5652620625874820,  # 'Project'
-                3400820812189572,  # 'Task'
-                586071045083012,  # 'Assigned To'
-                1711970951925636,  # 'Start Date'
-                6215570579296132,  # 'End Date'
-            ],
-        )
+        columns = client.Sheets.get_columns(sheet_id).data
+        _map = {col.title: col.id for col in columns if col.title in FIELDS}
+        return [_map[field] for field in FIELDS]
 
-        self.col_ids = self.get_col_ids()
-        self.monday, self.friday = self.get_week_range()
+    @staticmethod
+    def _get_week_offset(args) -> int:
+        if args.last_week:
+            return -1
+        elif args.next_week:
+            return 1
+        return 0
 
-    def run(self):
-        tasks_weekly = self._fetch_weekly_tasks()
-        tasks_employee = self._fetch_employee_tasks(tasks_weekly)
-        if not tasks_employee:
-            print("No tasks found.")
-            return
-
-        tasks = self._bubble_up(tasks_weekly, tasks_employee)
-        html = self.derive_html_content(tasks)
-        clipboard.copy_html_to_clipboard(html)
-        print("Copied to clipboard — paste into your slide with Ctrl+V.")
-
-    def get_col_ids(self) -> dict[str, int]:
-        return {col.title: col.id for col in self.sheet.columns}
-
-    def get_week_range(self) -> tuple[datetime.date, datetime.date]:
+    @staticmethod
+    def _get_week_range(week_offset: int) -> tuple[datetime.date, datetime.date]:
         tz = zoneinfo.ZoneInfo(TIMEZONE)
         today = datetime.datetime.now(tz).date()
         this_monday = today - datetime.timedelta(days=today.weekday())
 
-        monday = this_monday + datetime.timedelta(weeks=self.week_offset)
+        monday = this_monday + datetime.timedelta(weeks=week_offset)
         friday = monday + datetime.timedelta(days=4)
         return monday, friday
 
@@ -90,11 +70,13 @@ class App:
         except ValueError:
             return None
 
-    def _fetch_weekly_tasks(self) -> dict[int, Task]:
+    def _fetch_weekly_tasks(
+        self, column_task: int, column_assign: int, column_start: int, column_end: int
+    ) -> dict[int, Task]:
         tasks: dict[int, Task] = {}
         for row in self.sheet.rows:
-            start = self._parse_date(row.get_column(self.col_ids[FIELD_START]).value)
-            end = self._parse_date(row.get_column(self.col_ids[FIELD_END]).value)
+            start = self._parse_date(row.get_column(column_start).value)
+            end = self._parse_date(row.get_column(column_end).value)
 
             if not start or not end:
                 continue
@@ -104,8 +86,8 @@ class App:
 
             tasks[row.id_] = Task(
                 parent_id=row.parent_id,
-                task_name=row.get_column(self.col_ids[FIELD_TASK]).value,
-                assign=row.get_column(self.col_ids[FIELD_ASSIGN]).value,
+                task_name=row.get_column(column_task).value,
+                assign=row.get_column(column_assign).value,
             )
         return tasks
 
@@ -158,7 +140,7 @@ class App:
 
         return f"<ul style='{STYLE_TASK_CHILD}'>" + items + "</ul>"
 
-    def derive_html_content(self, tasks: dict[int, Task]) -> str:
+    def _derive_html_content(self, tasks: dict[int, Task]) -> str:
         monday_fmt = self.monday.strftime("%b ") + str(self.monday.day)
         friday_fmt = (
             self.friday.strftime("%b ")
@@ -176,6 +158,18 @@ class App:
             items_html += task_html + childs_html
 
         return header_html + items_html
+
+    def run(self):
+        tasks_weekly = self._fetch_weekly_tasks(*self.column_ids)
+        tasks_employee = self._fetch_employee_tasks(tasks_weekly)
+        if not tasks_employee:
+            print("No tasks found.")
+            return
+
+        tasks = self._bubble_up(tasks_weekly, tasks_employee)
+        html = self._derive_html_content(tasks)
+        clipboard.copy_html_to_clipboard(html)
+        print("Copied to clipboard — paste into your slide with Ctrl+V.")
 
 
 def main():
