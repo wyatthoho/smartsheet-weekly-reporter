@@ -62,7 +62,8 @@ class App:
         friday = monday + datetime.timedelta(days=4)
         return monday, friday
 
-    def _parse_date(self, value: str | None) -> datetime.date | None:
+    @staticmethod
+    def _parse_date(value: str | None) -> datetime.date | None:
         if not value:
             return None
         try:
@@ -91,11 +92,10 @@ class App:
             )
         return tasks
 
-    def _fetch_employee_tasks(self, tasks: dict[int, Task]) -> dict[int, Task]:
+    @staticmethod
+    def _fetch_employee_tasks(tasks: dict[int, Task], employee: str) -> dict[int, Task]:
         return {
-            row_id: task
-            for row_id, task in tasks.items()
-            if task.assign == self.employee
+            row_id: task for row_id, task in tasks.items() if task.assign == employee
         }
 
     def _climb(self, row_id: int, tasks: dict[int, Task], visited: set[int]):
@@ -161,7 +161,7 @@ class App:
 
     def run(self):
         tasks_weekly = self._fetch_weekly_tasks(*self.column_ids)
-        tasks_employee = self._fetch_employee_tasks(tasks_weekly)
+        tasks_employee = self._fetch_employee_tasks(tasks_weekly, self.employee)
         if not tasks_employee:
             print("No tasks found.")
             return
