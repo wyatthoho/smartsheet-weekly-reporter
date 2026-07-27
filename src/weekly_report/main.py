@@ -1,14 +1,13 @@
 import copy
+import datetime
+import zoneinfo
 from dataclasses import dataclass, field
-from datetime import date, datetime, timedelta
 
 import smartsheet
 
-from weekly_report import cli
-from weekly_report import clipboard
-from weekly_report import config
+from weekly_report import cli, clipboard, config
 
-
+TIMEZONE = "Asia/Taipei"
 FIELD_ASSIGN = "Assigned To"
 FIELD_START = "Start Date"
 FIELD_END = "End Date"
@@ -50,7 +49,7 @@ class App:
             column_ids=[
                 5652620625874820,  # 'Project'
                 3400820812189572,  # 'Task'
-                586071045083012,   # 'Assigned To'
+                586071045083012,  # 'Assigned To'
                 1711970951925636,  # 'Start Date'
                 6215570579296132,  # 'End Date'
             ],
@@ -74,19 +73,20 @@ class App:
     def get_col_ids(self) -> dict[str, int]:
         return {col.title: col.id for col in self.sheet.columns}
 
-    def get_week_range(self) -> tuple[date, date]:
-        today = date.today()
-        monday = (
-            today - timedelta(days=today.weekday()) + timedelta(weeks=self.week_offset)
-        )
-        friday = monday + timedelta(days=4)
+    def get_week_range(self) -> tuple[datetime.date, datetime.date]:
+        tz = zoneinfo.ZoneInfo(TIMEZONE)
+        today = datetime.datetime.now(tz).date()
+        this_monday = today - datetime.timedelta(days=today.weekday())
+
+        monday = this_monday + datetime.timedelta(weeks=self.week_offset)
+        friday = monday + datetime.timedelta(days=4)
         return monday, friday
 
-    def _parse_date(self, value: str | None) -> date | None:
+    def _parse_date(self, value: str | None) -> datetime.date | None:
         if not value:
             return None
         try:
-            return datetime.fromisoformat(value).date()
+            return datetime.datetime.fromisoformat(value).date()
         except ValueError:
             return None
 

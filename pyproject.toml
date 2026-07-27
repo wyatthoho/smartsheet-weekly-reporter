@@ -8,9 +8,10 @@ version = "1.0.0"
 description = "Fetch tasks from Smartsheet for the specified week and formats them for easy pasting straight into PowerPoint slides."
 authors = [{ name = "wyatthoho", email = "wyatthoho@gmail.com" }]
 dependencies = [
-    "smartsheet-python-sdk >= 3.0.0",
     "python-dotenv >= 1.2.2",
     "pywin32 >= 306",
+    "smartsheet-python-sdk >= 3.0.0",
+    "tzdata >= 2024.1",
 ]
 requires-python = ">=3.12"
 readme = "README.md"

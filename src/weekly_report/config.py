@@ -1,8 +1,7 @@
 import os
 import sys
 
-from dotenv import load_dotenv, find_dotenv
-
+from dotenv import find_dotenv, load_dotenv
 
 ENV_API_TOKEN = "API_TOKEN"
 ENV_SHEET_ID = "SHEET_ID"
