@@ -8,7 +8,10 @@ import smartsheet
 from weekly_report import cli, clipboard, config
 
 TIMEZONE = "Asia/Taipei"
-FIELDS = ["Task", "Assigned To", "Start Date", "End Date"]
+COLUMN_TASK = "Task"
+COLUMN_ASSIGN = "Assigned To"
+COLUMN_START = "Start Date"
+COLUMN_END = "End Date"
 STYLE_HEADER = "font-size:40pt; margin:0; margin-bottom:8px; text-align:left;"
 STYLE_TASK_MAIN = "font-size:28pt; margin:20pt 0 0 0; text-align:left;"
 STYLE_TASK_CHILD = "font-size:28pt; margin:6pt 0 0 0; color:gray; text-align:left;"
@@ -31,18 +34,22 @@ class App:
         api_token, sheet_id, self.employee = config.load_env_config()
         client = smartsheet.Smartsheet(api_token)
 
-        self.column_ids = self._get_column_ids(client, sheet_id)
-        self.sheet = client.Sheets.get_sheet(sheet_id, column_ids=self.column_ids)
+        self.columns_map = self._get_columns_map(client, sheet_id)
+
+        columm_ids = list(self.columns_map.values())
+        self.sheet = client.Sheets.get_sheet(sheet_id, column_ids=columm_ids)
 
     @staticmethod
-    def _get_column_ids(client: smartsheet.Smartsheet, sheet_id: str) -> list[int]:
+    def _get_columns_map(
+        client: smartsheet.Smartsheet, sheet_id: str
+    ) -> dict[str, int]:
         # Limit to specific columns (instead of fetching all columns/rows) to avoid
         # a 500/errorCode 4000 "unexpected error" from the Smartsheet API, likely
         # caused by the full sheet response being too large or containing an
         # unsupported column type.
+        titles = [COLUMN_TASK, COLUMN_ASSIGN, COLUMN_START, COLUMN_END]
         columns = client.Sheets.get_columns(sheet_id).data
-        _map = {col.title: col.id for col in columns if col.title in FIELDS}
-        return [_map[field] for field in FIELDS]
+        return {col.title: col.id for col in columns if col.title in titles}
 
     @staticmethod
     def _get_week_offset(args) -> int:
@@ -71,10 +78,13 @@ class App:
         except ValueError:
             return None
 
-    def _fetch_weekly_tasks(
-        self, column_task: int, column_assign: int, column_start: int, column_end: int
-    ) -> dict[int, Task]:
+    def _fetch_weekly_tasks(self) -> dict[int, Task]:
         tasks: dict[int, Task] = {}
+        column_start = self.columns_map[COLUMN_START]
+        column_end = self.columns_map[COLUMN_END]
+        column_task = self.columns_map[COLUMN_TASK]
+        column_assign = self.columns_map[COLUMN_ASSIGN]
+
         for row in self.sheet.rows:
             start = self._parse_date(row.get_column(column_start).value)
             end = self._parse_date(row.get_column(column_end).value)
@@ -88,7 +98,7 @@ class App:
             tasks[row.id_] = Task(
                 parent_id=row.parent_id,
                 task_name=row.get_column(column_task).value,
-                assign=row.get_column(column_assign).value,
+                assign=row.get_column(column_assign).display_value,
             )
         return tasks
 
@@ -160,7 +170,7 @@ class App:
         return header_html + items_html
 
     def run(self):
-        tasks_weekly = self._fetch_weekly_tasks(*self.column_ids)
+        tasks_weekly = self._fetch_weekly_tasks()
         tasks_employee = self._fetch_employee_tasks(tasks_weekly, self.employee)
         if not tasks_employee:
             print("No tasks found.")
