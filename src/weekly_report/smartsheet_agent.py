@@ -119,3 +119,14 @@ class SmartsheetAgent:
             return
 
         return self._bubble_up(tasks_weekly, tasks_employee)
+
+    def fetch_employees(self):
+        column_assign = self.columns_map[COLUMN_ASSIGN]
+
+        employees = set()
+        for row in self.sheet.rows:
+            _name = row.get_column(column_assign).display_value
+            if _name and (_name not in employees):
+                employees.add(_name)
+
+        return employees

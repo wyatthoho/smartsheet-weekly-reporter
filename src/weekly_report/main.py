@@ -1,6 +1,8 @@
 import datetime
 import zoneinfo
 
+import streamlit as st
+
 from weekly_report import cli, clipboard, config
 from weekly_report.smartsheet_agent import SmartsheetAgent, Task
 
@@ -16,8 +18,23 @@ class App:
         week_offset = self._get_week_offset(args)
         self.monday, self.friday = self._get_week_range(week_offset)
 
-        api_token, sheet_id, self.employee = config.load_env_config()
+        api_token, sheet_id = config.load_env_config()
         self.smartsheet_agent = SmartsheetAgent(api_token, sheet_id)
+
+        st.header("Smartsheet Weekly Reporter")
+        employees = self.smartsheet_agent.fetch_employees()
+        self.employee = st.selectbox(
+            label="Select employee",
+            options=sorted(employees),
+            index=None,
+            placeholder="Employee name...",
+        )
+
+        st.date_input(
+            label="Week range",
+            value=(self.monday, self.friday),
+            format="YYYY.MM.DD",
+        )
 
     @staticmethod
     def _get_week_offset(args) -> int:
@@ -48,7 +65,7 @@ class App:
 
         return f"<ul style='{STYLE_TASK_CHILD}'>" + items + "</ul>"
 
-    def _derive_html_content(self, tasks: dict[int, Task]) -> str:
+    def _derive_html_header(self) -> str:
         monday_fmt = self.monday.strftime("%b ") + str(self.monday.day)
         friday_fmt = (
             self.friday.strftime("%b ")
@@ -56,30 +73,42 @@ class App:
             + self.friday.strftime(", %Y")
         )
         header_str = f"{monday_fmt} - {friday_fmt}"
+        return f"<p style='{STYLE_HEADER}'><b>{header_str}</b></p>"
 
-        header_html = f"<p style='{STYLE_HEADER}'><b>{header_str}</b></p>"
-
+    def _derive_html_items(self, tasks: dict[int, Task]) -> str:
         items_html = ""
         for task in tasks.values():
             task_html = f"<p style='{STYLE_TASK_MAIN}'>{task.task_name}</p>"
             childs_html = "<ul>" + self._fmt_children(task.children) + "</ul>"
             items_html += task_html + childs_html
+        return items_html
 
-        return header_html + items_html
+    def get_html(self):
+        html_header = self._derive_html_header()
 
-    def run(self):
+        if not self.employee:
+            return html_header
+
         tasks = self.smartsheet_agent.fetch_tasks(
             employee=self.employee,
             monday=self.monday,
             friday=self.friday,
         )
-        html = self._derive_html_content(tasks)
-        clipboard.copy_html_to_clipboard(html)
-        print("Copied to clipboard — paste into your slide with Ctrl+V.")
+
+        return html_header + self._derive_html_items(tasks)
+
+    def render_html(self):
+        html = self.get_html()
+        st.text("HTML content rendering")
+        with st.container(border=True):
+            st.html(body=html)
 
 
 def main():
-    App().run()
+    app = App()
+    app.render_html()
+    # clipboard.copy_html_to_clipboard(html)
+    # print("Copied to clipboard — paste into your slide with Ctrl+V.")
 
 
 if __name__ == "__main__":
