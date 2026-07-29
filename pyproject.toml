@@ -9,7 +9,6 @@ description = "Fetch tasks from Smartsheet for the specified week and formats th
 authors = [{ name = "wyatthoho", email = "wyatthoho@gmail.com" }]
 dependencies = [
     "python-dotenv >= 1.2.2",
-    "pywin32 >= 306",
     "smartsheet-python-sdk >= 3.0.0",
     "streamlit>=1.30.0",
     "tzdata >= 2024.1",
