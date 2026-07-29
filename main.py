@@ -6,6 +6,8 @@ import streamlit as st
 from utils import config
 from utils.smartsheet_agent import SmartsheetAgent, Task
 
+TITLE = "Smartsheet Weekly Reporter"
+ICO_PATH = "./imgs/report.ico"
 TIMEZONE = "Asia/Taipei"
 STYLE_HEADER = "font-size:18pt; margin:0 0 16px 0; text-align:left;"
 STYLE_TASK_MAIN = "font-size:12pt; margin:0; text-align:left;"
@@ -16,6 +18,8 @@ STYLE_TASK_CHILD = (
 
 class App:
     def __init__(self):
+        st.set_page_config(page_title=TITLE, page_icon=ICO_PATH)
+
         self.smartsheet_agent = SmartsheetAgent(*config.load_env_config())
         employees = self.smartsheet_agent.fetch_employees()
 
