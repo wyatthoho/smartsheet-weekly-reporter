@@ -34,5 +34,5 @@ SHEET_ID=your_smartsheet_id
 Get the streamlit running in minutes:
 
 ```bash
-streamlit run ./src/weekly_report/main.py 
+streamlit run main.py
 ```

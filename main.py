@@ -3,8 +3,8 @@ import zoneinfo
 
 import streamlit as st
 
-from weekly_report import config
-from weekly_report.smartsheet_agent import SmartsheetAgent, Task
+from utils import config
+from utils.smartsheet_agent import SmartsheetAgent, Task
 
 TIMEZONE = "Asia/Taipei"
 STYLE_HEADER = "font-size:18pt; margin:0 0 16px 0; text-align:left;"

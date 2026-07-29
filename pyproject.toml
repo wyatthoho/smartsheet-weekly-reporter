@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "smartsheet-weekly-reporter"
 version = "1.0.0"
-description = "Fetch tasks from Smartsheet for the specified week and formats them for easy pasting straight into PowerPoint slides."
+description = "Fetch tasks from Smartsheet for the specified user and week, via a Streamlit web app that runs in your browser."
 authors = [{ name = "wyatthoho", email = "wyatthoho@gmail.com" }]
 dependencies = [
     "python-dotenv >= 1.2.2",
@@ -17,11 +17,3 @@ requires-python = ">=3.12"
 readme = "README.md"
 license = { file = "LICENSE" }
 
-[project.scripts]
-weekly-report = "weekly_report.main:main"
-
-[tool.setuptools]
-package-dir = { "" = "src" }
-
-[project.optional-dependencies]
-dev = ["pytest >= 8.3.4"]
