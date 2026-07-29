@@ -7,9 +7,11 @@ from weekly_report import clipboard, config
 from weekly_report.smartsheet_agent import SmartsheetAgent, Task
 
 TIMEZONE = "Asia/Taipei"
-STYLE_HEADER = "font-size:18pt; margin:0; text-align:left;"
+STYLE_HEADER = (
+    "font-size:18pt; margin:0 0 16px 0; text-align:left;"  # Added margin-bottom: 20px
+)
 STYLE_TASK_MAIN = "font-size:12pt; margin:0; text-align:left;"
-STYLE_TASK_CHILD = "font-size:12pt; margin:0; color:gray; text-align:left;"
+STYLE_TASK_CHILD = "font-size:12pt; margin:0; color:gray; text-align:left; padding-left:12px;"
 
 
 class App:
@@ -70,7 +72,7 @@ class App:
             items_html += task_html + childs_html
         return items_html
 
-    def _get_html(self):
+    def _get_html(self) -> str:
         html_header = self._derive_html_header()
 
         if not self.employee:
@@ -84,17 +86,30 @@ class App:
 
         return html_header + self._derive_html_items(tasks)
 
+    def _on_click(self, html: str):
+        clipboard.copy_html_to_clipboard(html)
+        st.toast(
+            "Copied to clipboard. Paste into your slide with Ctrl+V.",
+            icon=":material/content_copy:",
+        )
+
     def render_html(self):
+        html = self._get_html()
+
         st.text("Queried tasks")
         with st.container(border=True):
-            st.html(body=self._get_html())
+            st.html(body=html)
+
+        st.button(
+            label="Copy",
+            on_click=self._on_click,
+            args=[html],
+        )
 
 
 def main():
     app = App()
     app.render_html()
-    # clipboard.copy_html_to_clipboard(html)
-    # print("Copied to clipboard — paste into your slide with Ctrl+V.")
 
 
 if __name__ == "__main__":
