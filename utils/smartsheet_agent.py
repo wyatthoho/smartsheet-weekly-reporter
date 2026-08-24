@@ -110,17 +110,18 @@ class SmartsheetAgent:
             if row_id in visited and not task.parent_id
         }
 
-    def fetch_tasks(self, employee: str, monday: datetime.date, friday: datetime.date):
+    def fetch_tasks(
+        self, employee: str, monday: datetime.date, friday: datetime.date
+    ) -> dict[int, Task] | None:
         tasks_weekly = self._fetch_weekly_tasks(monday, friday)
         tasks_employee = self._fetch_employee_tasks(tasks_weekly, employee)
 
         if not tasks_employee:
-            print("No tasks found.")
             return
 
         return self._bubble_up(tasks_weekly, tasks_employee)
 
-    def fetch_employees(self):
+    def fetch_employees(self) -> set[str]:
         column_assign = self.columns_map[COLUMN_ASSIGN]
 
         employees = set()

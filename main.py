@@ -14,6 +14,9 @@ STYLE_TASK_MAIN = "font-size:12pt; margin:0; text-align:left;"
 STYLE_TASK_CHILD = (
     "font-size:12pt; margin:0; color:gray; text-align:left; padding-left:12px;"
 )
+STYLE_MESSAGE = (
+    "font-size:12pt; margin:0; color:gray; text-align:left; font-style:italic;"
+)
 
 
 class App:
@@ -49,7 +52,7 @@ class App:
 
     def _fmt_children(self, children: list[Task]) -> str:
         if not children:
-            return ""
+            return "<br>"
 
         items = "".join(
             "<li>" + child.task_name + self._fmt_children(child.children) + "</li>"
@@ -80,13 +83,16 @@ class App:
         html_header = self._derive_html_header()
 
         if not self.employee:
-            return html_header
+            return f"<p style='{STYLE_MESSAGE}'>Select an employee to view tasks.</p>"
 
         tasks = self.smartsheet_agent.fetch_tasks(
             employee=self.employee,
             monday=self.monday,
             friday=self.friday,
         )
+
+        if not tasks:
+            return f"<p style='{STYLE_MESSAGE}'>No tasks found for the selected date range.</p>"
 
         return html_header + self._derive_html_items(tasks)
 

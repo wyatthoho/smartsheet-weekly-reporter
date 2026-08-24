@@ -15,7 +15,7 @@ def _get_env_variable(key: str) -> str:
     return var
 
 
-def load_env_config() -> tuple[str, str, str]:
+def load_env_config() -> tuple[str, str]:
     try:
         load_dotenv(find_dotenv())
         api_token = _get_env_variable(ENV_API_TOKEN)
