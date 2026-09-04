@@ -62,12 +62,8 @@ class App:
         return f"<ul style='{STYLE_TASK_CHILD}'>" + items + "</ul>"
 
     def _derive_html_header(self) -> str:
-        monday_fmt = self.monday.strftime("%b ") + str(self.monday.day)
-        friday_fmt = (
-            self.friday.strftime("%b ")
-            + str(self.friday.day)
-            + self.friday.strftime(", %Y")
-        )
+        monday_fmt = self.monday.strftime("%m/%d")
+        friday_fmt = self.friday.strftime("%m/%d")
         header_str = f"{monday_fmt} - {friday_fmt}"
         return f"<p style='{STYLE_HEADER}'><b>{header_str}</b></p>"
 
