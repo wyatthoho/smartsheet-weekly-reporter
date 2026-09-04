@@ -52,7 +52,7 @@ class App:
 
     def _fmt_children(self, children: list[Task]) -> str:
         if not children:
-            return "<br>"
+            return ""
 
         items = "".join(
             "<li>" + child.task_name + self._fmt_children(child.children) + "</li>"
